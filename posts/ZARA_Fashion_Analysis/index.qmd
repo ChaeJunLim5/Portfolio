@@ -1,1 +1,75 @@
+---
+title: "ZARA Fashion Data Analysis"
+author: "ChaeJun Lim"
+date: "2025-08-07"
+format: html
+editor: visual
+---
 
+## 🧭 Project Background
+
+### Why Fashion?
+- Our group members are interested in fashion and marketing.
+- Fashion plays an important role in consumers' daily decision-making.
+
+### Why ZARA?
+- ZARA is a well-known brand over the world.
+- It has strong global presence and fast fashion structure.
+
+### Research Question
+What is the relationship between consumer characteristics and the number of clothing sales?
+
+
+## 📂 Dataset Overview
+
+- Data Source: Kaggle (`Fashion World DA`)
+- Brand: ZARA
+- Time period: 2018–2022
+
+### Included Variables
+- Numerical: `price`, `reviews_count`, `wish_list_count`, ...
+- Categorical: `gender`, `category`, `pattern`, `season`, `material`, ...
+
+## 🖼️ Project Slide Overview
+
+![Slide 1](images/slide1.png)
+
+*(Group project slide showing key results from analysis)*
+
+
+## 🧾 Project Overview
+
+This project explores ZARA fashion data (2018–2022), analyzing the relationship between price, category, gender, and sales.
+
+We used:
+- ggplot2 for visualizations
+- infer package for permutation hypothesis testing
+
+---
+
+## 📊 Visualizations
+
+### 💸 Price vs Sales Count
+
+- Scatter plot shows weak negative correlation between price and sales.
+- High sales tend to occur at lower price points.
+
+![Scatter](images/price_sales_plot.png)  
+*(Example visualization from ggplot2)*
+
+### 🧑‍🤝‍🧑 Sales by Gender
+
+- Males tend to purchase more items than females in dataset.
+- Gender difference confirmed through permutation test.
+
+---
+
+## 🔬 Hypothesis Testing Summary
+
+We conducted a permutation test using the `infer` package to check if gender has a statistically significant effect on sales count.
+
+- **Null hypothesis**: Sales count is independent of gender.
+- **p-value**: 0.02 (suggests statistical significance at 5% level)
+- **Conclusion**: Gender **does** influence purchasing behavior in ZARA data.
+
+> 📎 *Full code is available in [`final.Rmd`](final.Rmd)*
