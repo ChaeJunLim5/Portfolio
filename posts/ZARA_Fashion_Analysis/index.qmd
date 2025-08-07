@@ -64,12 +64,28 @@ We used:
 
 ---
 
-## 🔬 Hypothesis Testing Summary
+## 📸 Key Results & Business Implications
 
-We conducted a permutation test using the `infer` package to check if gender has a statistically significant effect on sales count.
+### 🎯 Hypothesis Testing Summary
 
-- **Null hypothesis**: Sales count is independent of gender.
-- **p-value**: 0.02 (suggests statistical significance at 5% level)
-- **Conclusion**: Gender **does** influence purchasing behavior in ZARA data.
+![Result Summary](images/slide_result.png)
+
+- All p-values > 0.05 → No statistically significant relationship
+- Gender, Age, Season do **not** significantly affect `Sales_count`
+
+### 💡 Practical Implications
+
+![Implications Table](images/slide_implication1.png)
+
+- Marketing strategy does **not** need to heavily segment by demographic factors
+- Broad product appeal across demographics
+
+### 🧩 Strategic Insights for ZARA
+
+![ZARA Strategy Slide](images/slide_implication2.png)
+
+- ZARA’s consistent performance across segments
+- Strong foundation for wide-range product and marketing strategy
+
 
 > 📎 *Full code is available in [`final.Rmd`](final.Rmd)*
