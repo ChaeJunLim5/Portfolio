@@ -54,9 +54,6 @@ We used:
 - Scatter plot shows weak negative correlation between price and sales.
 - High sales tend to occur at lower price points.
 
-![Scatter](images/price_sales_plot.png)  
-*(Example visualization from ggplot2)*
-
 ### 🧑‍🤝‍🧑 Sales by Gender
 
 - Males tend to purchase more items than females in dataset.
