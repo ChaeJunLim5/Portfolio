@@ -1,0 +1,1599 @@
+---
+title: "Spatial Autocorrelation for Rent and Income in Virginia"
+author: "Chaejun Lim & Ivan Einselen"
+date: "2025-05-19"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+This blog post explores spatial autocorrellation for median gross rent and median household income for census tracts in Virginia. Data comes from Social Explorer (https://www.socialexplorer.com/explore-tables) 5-year estimate survey data for both income and rent.
+
+We expect to see high levels of income and rent in areas outside of the cities, particularly suburbs in Northern Virginia, Richmond, and Hampton Roads (https://dmz1.dhcd.virginia.gov/HB854/part-1-markets.html), and smaller levels of both in small market areas (Southwestern Virginia particularly). We also expect to find the areas of clear positive autocorrellation to be in North Virginia and the Southwestern/Western region.
+
+We use a Global Moran's I statistic to assess how clustered Virginia itself is. The closer the number is to 1, the more clustered income and rent census tracts tend to be (how high income/rent areas tend to be attracted to other areas of high income/rent). Significance in every spatial weight and cluster analysis is set at the 0.05 level.
+
+Median household income gauges the general area. Rent is more representative for below-median income and smaller-sized households, in a way. This is because, in most cases, renters are more likely to not be able to afford to own property. This is particularly true in smaller markets, and especially true in rural markets (https://dmz1.dhcd.virginia.gov/HB854/part-3-rental.html), as apposed to large market areas, where there are more luxury rentals available. It should also be noted that people are more likely to rent in large market areas (the populations are also much larger). Additionally,renters tend to be made up of small household sizes in all three market sizes. From 2010 to 1019, about 40% of renters lived in one-person household sized spaces, and just under 30% in two-person sized space. 
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Libraries - 1 -----------------------------------------------------------------
+
+library(ggplot2)
+library(plotly)
+library(dplyr)
+library(reshape2)
+library(gganimate)
+library(sf)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Prep -----------------------------------------------------------------
+
+Census_Tract <- read_sf("tl_2024_51_tract/tl_2024_51_tract.shp")
+#Census_Tract <- read_sf("tl_2024_51_tract.shp")
+Census_Tract <- Census_Tract %>%
+  mutate(GEOID = as.character(GEOID))
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+# Census Tract Data for Income and Rent
+
+#19~23
+
+VA_2021 <- read.csv("19_23/R13872740_SL140.csv")
+VA_2021 <- VA_2021 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001,
+    GEOIDFQ = Geo_GEO_ID) %>%
+  mutate(
+    GEOID = sub(".*US", "", GEOIDFQ),
+    GEOID = as.character(GEOID)
+  )
+
+common_geoids_2021 <- intersect(Census_Tract$GEOID, VA_2021$GEOID)
+length(common_geoids_2021)
+
+
+VA_filtered_2021 <- VA_2021 %>% 
+  filter(GEOID %in% common_geoids_2021)
+
+Census_filtered_2021 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2021)
+
+Census_Joined_2021 <- Census_filtered_2021 %>%
+  left_join(VA_filtered_2021, by = "GEOID")
+
+VA_2021 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2021 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2021 <- Census_Joined_2021 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#18~22
+
+
+VA_2020 <- read.csv("18_22/R13877050_SL140.csv") %>%
+  relocate(SE_A14006_001,SE_A18009_001)
+VA_2020 <- VA_2020 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  )
+
+common_geoids_2020 <- intersect(Census_Tract$GEOID, VA_2020$GEOID)
+length(common_geoids_2020)
+
+VA_filtered_2020 <- VA_2020 %>% 
+  filter(GEOID %in% common_geoids_2020)
+
+Census_filtered_2020 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2020)
+
+Census_Joined_2020 <- Census_filtered_2020 %>%
+  left_join(VA_filtered_2020, by = "GEOID")
+
+
+
+VA_2020 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2020 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2020 <- Census_Joined_2020 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#17~21
+
+VA_2019 <- read.csv("17_21/R13877071_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2019 <- VA_2019 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2019 <- intersect(Census_Tract$GEOID, VA_2019$GEOID)
+length(common_geoids_2019)
+
+VA_filtered_2019 <- VA_2019 %>% 
+  filter(GEOID %in% common_geoids_2019)
+
+Census_filtered_2019 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2019)
+
+Census_Joined_2019 <- Census_filtered_2019 %>%
+  left_join(VA_filtered_2019, by = "GEOID")
+
+
+
+VA_2019 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2019 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2019 <- Census_Joined_2019 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#16~20
+
+VA_2018 <- read.csv("16_20/R13877053_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2018 <- VA_2018 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2018 <- intersect(Census_Tract$GEOID, VA_2018$GEOID)
+length(common_geoids_2018)
+
+VA_filtered_2018 <- VA_2018 %>% 
+  filter(GEOID %in% common_geoids_2018)
+
+Census_filtered_2018 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2018)
+
+Census_Joined_2018 <- Census_filtered_2018 %>%
+  left_join(VA_filtered_2018, by = "GEOID")
+
+
+
+VA_2018 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2018 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2018 <- Census_Joined_2018 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#15~19
+
+VA_2017 <- read.csv("15_19/R13877054_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2017 <- VA_2017 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2017 <- intersect(Census_Tract$GEOID, VA_2017$GEOID)
+length(common_geoids_2017)
+
+VA_filtered_2017 <- VA_2017 %>% 
+  filter(GEOID %in% common_geoids_2017)
+
+Census_filtered_2017 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2017)
+
+Census_Joined_2017 <- Census_filtered_2017 %>%
+  left_join(VA_filtered_2017, by = "GEOID")
+
+
+
+VA_2017 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2017 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2017 <- Census_Joined_2017 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#14~18
+
+VA_2016 <- read.csv("14_18/R13877055_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2016 <- VA_2016 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2016 <- intersect(Census_Tract$GEOID, VA_2016$GEOID)
+length(common_geoids_2016)
+
+VA_filtered_2016 <- VA_2016 %>% 
+  filter(GEOID %in% common_geoids_2016)
+
+Census_filtered_2016 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2016)
+
+Census_Joined_2016 <- Census_filtered_2016 %>%
+  left_join(VA_filtered_2016, by = "GEOID")
+
+
+
+VA_2016 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2016 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2016 <- Census_Joined_2016 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#13~17
+
+
+VA_2015 <- read.csv("13_17/R13877056_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2015 <- VA_2015 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2015 <- intersect(Census_Tract$GEOID, VA_2015$GEOID)
+length(common_geoids_2015)
+
+VA_filtered_2015 <- VA_2015 %>% 
+  filter(GEOID %in% common_geoids_2015)
+
+Census_filtered_2015 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2015)
+
+Census_Joined_2015 <- Census_filtered_2015 %>%
+  left_join(VA_filtered_2015, by = "GEOID")
+
+
+
+VA_2015 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2015 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2015 <- Census_Joined_2015 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#12~16
+
+VA_2014 <- read.csv("12_16/R13877057_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2014 <- VA_2014 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2014 <- intersect(Census_Tract$GEOID, VA_2014$GEOID)
+length(common_geoids_2014)
+
+VA_filtered_2014 <- VA_2014 %>% 
+  filter(GEOID %in% common_geoids_2014)
+
+Census_filtered_2014 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2014)
+
+Census_Joined_2014 <- Census_filtered_2014 %>%
+  left_join(VA_filtered_2014, by = "GEOID")
+
+
+
+VA_2014 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2014 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2014 <- Census_Joined_2014 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#11~15
+
+
+VA_2013 <- read.csv("11_15/R13877058_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2013 <- VA_2013 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2013 <- intersect(Census_Tract$GEOID, VA_2013$GEOID)
+length(common_geoids_2013)
+
+VA_filtered_2013 <- VA_2013 %>% 
+  filter(GEOID %in% common_geoids_2013)
+
+Census_filtered_2013 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2013)
+
+Census_Joined_2013 <- Census_filtered_2013 %>%
+  left_join(VA_filtered_2013, by = "GEOID")
+
+
+VA_2013 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2013 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2013 <- Census_Joined_2013 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#10~14
+
+
+VA_2012 <- read.csv("10_14/R13877059_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2012 <- VA_2012 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2012 <- intersect(Census_Tract$GEOID, VA_2012$GEOID)
+length(common_geoids_2012)
+
+VA_filtered_2012 <- VA_2012 %>% 
+  filter(GEOID %in% common_geoids_2012)
+
+Census_filtered_2012 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2012)
+
+Census_Joined_2012 <- Census_filtered_2012 %>%
+  left_join(VA_filtered_2012, by = "GEOID")
+
+
+
+VA_2012 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2012 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2012 <- Census_Joined_2012 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+
+
+#09~13
+
+VA_2011 <- read.csv("09_13/R13877060_SL140.csv") %>%
+  relocate(SE_A14006_001, SE_A18009_001)
+
+VA_2011 <- VA_2011 %>%
+  rename(
+    median_house_income = SE_A14006_001,
+    median_gross_rent = SE_A18009_001) %>%
+  mutate(
+    GEOID = as.character(Geo_FIPS)
+  ) %>%
+  relocate(GEOID)
+
+common_geoids_2011 <- intersect(Census_Tract$GEOID, VA_2011$GEOID)
+length(common_geoids_2011)
+
+VA_filtered_2011 <- VA_2011 %>% 
+  filter(GEOID %in% common_geoids_2011)
+
+Census_filtered_2011 <- Census_Tract %>% 
+  filter(GEOID %in% common_geoids_2011)
+
+Census_Joined_2011 <- Census_filtered_2011 %>%
+  left_join(VA_filtered_2011, by = "GEOID")
+
+
+VA_2011 %>% 
+  filter(is.na(median_house_income)) %>% 
+  nrow()
+VA_2011 %>% 
+  filter(is.na(median_gross_rent)) %>% 
+  nrow()
+
+Census_Joined_2011 <- Census_Joined_2011 %>%
+  relocate(median_house_income, median_gross_rent, .after = GEOID)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# More libraries
+
+library(spdep)
+library(sf)
+library(tmap)
+library(tidyverse)
+```
+
+```{r, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+# the spatial weights + Global Moran’s I - Income and Rent -------------------------------
+
+# 2021
+# income(2021)
+
+
+Census_Joined_Income_2021 <- Census_Joined_2021 %>%
+  drop_na(median_house_income)
+
+nb_income_2021 <- poly2nb(Census_Joined_Income_2021, queen = TRUE)
+listw_income_2021 <- nb2listw(nb_income_2021, style = "W")
+
+global_moran_income_2021 <- moran.test(Census_Joined_Income_2021$median_house_income, listw = listw_income_2021)
+
+print(global_moran_income_2021)
+
+x_std_2021_income <- as.vector(scale(Census_Joined_Income_2021$median_house_income))
+y_lag_2021_income <- lag.listw(listw_income_2021, x_std_2021_income)
+
+
+
+
+# rent(2021)
+
+Census_Joined_Rent_2021 <- Census_Joined_2021 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2021 <- poly2nb(Census_Joined_Rent_2021, queen = TRUE)
+listw_rent_2021 <- nb2listw(nb_rent_2021, style = "W")
+
+global_moran_rent_2021 <- moran.test(Census_Joined_Rent_2021$median_gross_rent, listw = listw_rent_2021)
+print(global_moran_rent_2021)
+
+x_std_2021_rent <- as.vector(scale(Census_Joined_Rent_2021$median_gross_rent))
+y_lag_2021_rent <- lag.listw(listw_rent_2021, x_std_2021_rent)
+
+
+
+
+# 2020
+# income(2020)
+
+
+Census_Joined_Income_2020 <- Census_Joined_2020 %>%
+  drop_na(median_house_income)
+
+nb_income_2020 <- poly2nb(Census_Joined_Income_2020, queen = TRUE)
+listw_income_2020 <- nb2listw(nb_income_2020, style = "W")
+
+global_moran_income_2020 <- moran.test(Census_Joined_Income_2020$median_house_income, listw = listw_income_2020)
+
+print(global_moran_income_2020)
+
+x_std_2020_income <- as.vector(scale(Census_Joined_Income_2020$median_house_income))
+y_lag_2020_income <- lag.listw(listw_income_2020, x_std_2020_income)
+
+
+
+
+# rent(2020)
+
+
+Census_Joined_Rent_2020 <- Census_Joined_2020 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2020 <- poly2nb(Census_Joined_Rent_2020, queen = TRUE)
+listw_rent_2020 <- nb2listw(nb_rent_2020, style = "W")
+
+global_moran_rent_2020 <- moran.test(Census_Joined_Rent_2020$median_gross_rent, listw = listw_rent_2020)
+print(global_moran_rent_2020)
+
+x_std_2020_rent <- as.vector(scale(Census_Joined_Rent_2020$median_gross_rent))
+y_lag_2020_rent <- lag.listw(listw_rent_2020, x_std_2020_rent)
+
+
+
+
+# 2019
+# income(2019)
+
+
+Census_Joined_Income_2019 <- Census_Joined_2019 %>%
+  drop_na(median_house_income)
+
+nb_income_2019 <- poly2nb(Census_Joined_Income_2019, queen = TRUE)
+listw_income_2019 <- nb2listw(nb_income_2019, style = "W")
+
+global_moran_income_2019 <- moran.test(Census_Joined_Income_2019$median_house_income, listw = listw_income_2019)
+
+print(global_moran_income_2019)
+
+x_std_2019_income <- as.vector(scale(Census_Joined_Income_2019$median_house_income))
+y_lag_2019_income <- lag.listw(listw_income_2019, x_std_2019_income)
+
+
+
+
+# rent(2019)
+
+
+Census_Joined_Rent_2019 <- Census_Joined_2019 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2019 <- poly2nb(Census_Joined_Rent_2019, queen = TRUE)
+listw_rent_2019 <- nb2listw(nb_rent_2019, style = "W")
+
+global_moran_rent_2019 <- moran.test(Census_Joined_Rent_2019$median_gross_rent, listw = listw_rent_2019)
+print(global_moran_rent_2019)
+
+x_std_2019_rent <- as.vector(scale(Census_Joined_Rent_2019$median_gross_rent))
+y_lag_2019_rent <- lag.listw(listw_rent_2019, x_std_2019_rent)
+
+
+# 2018
+# income(2018)
+
+Census_Joined_Income_2018 <- Census_Joined_2018 %>%
+  drop_na(median_house_income)
+
+nb_income_2018 <- poly2nb(Census_Joined_Income_2018, queen = TRUE)
+listw_income_2018 <- nb2listw(nb_income_2018, style = "W")
+
+global_moran_income_2018 <- moran.test(Census_Joined_Income_2018$median_house_income, listw = listw_income_2018)
+
+print(global_moran_income_2018)
+
+x_std_2018_income <- as.vector(scale(Census_Joined_Income_2018$median_house_income))
+y_lag_2018_income <- lag.listw(listw_income_2018, x_std_2018_income)
+
+
+
+
+# rent(2018)
+
+
+Census_Joined_Rent_2018 <- Census_Joined_2018 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2018 <- poly2nb(Census_Joined_Rent_2018, queen = TRUE)
+listw_rent_2018 <- nb2listw(nb_rent_2018, style = "W")
+
+global_moran_rent_2018 <- moran.test(Census_Joined_Rent_2018$median_gross_rent, listw = listw_rent_2018)
+print(global_moran_rent_2018)
+
+x_std_2018_rent <- as.vector(scale(Census_Joined_Rent_2018$median_gross_rent))
+y_lag_2018_rent <- lag.listw(listw_rent_2018, x_std_2018_rent)
+
+
+
+
+# 2017
+# income(2017)
+
+
+Census_Joined_Income_2017 <- Census_Joined_2017 %>%
+  drop_na(median_house_income)
+
+nb_income_2017 <- poly2nb(Census_Joined_Income_2017, queen = TRUE)
+listw_income_2017 <- nb2listw(nb_income_2017, style = "W")
+
+global_moran_income_2017 <- moran.test(Census_Joined_Income_2017$median_house_income, listw = listw_income_2017)
+
+print(global_moran_income_2017)
+
+x_std_2017_income <- as.vector(scale(Census_Joined_Income_2017$median_house_income))
+y_lag_2017_income <- lag.listw(listw_income_2017, x_std_2017_income)
+
+
+
+
+# rent(2017) -> spatial unit
+
+
+Census_Joined_Rent_2017 <- Census_Joined_2017 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2017 <- poly2nb(Census_Joined_Rent_2017, queen = TRUE)
+listw_rent_2017 <- nb2listw(nb_rent_2017, style = "W", zero.policy = TRUE) #add zero policy to use this code
+
+global_moran_rent_2017 <- moran.test(Census_Joined_Rent_2017$median_gross_rent, listw = listw_rent_2017)
+print(global_moran_rent_2017)
+
+x_std_2017_rent <- as.vector(scale(Census_Joined_Rent_2017$median_gross_rent))
+y_lag_2017_rent <- lag.listw(listw_rent_2017, x_std_2017_rent)
+
+
+
+
+# 2016
+# income(2016)
+
+
+Census_Joined_Income_2016 <- Census_Joined_2016 %>%
+  drop_na(median_house_income)
+
+nb_income_2016 <- poly2nb(Census_Joined_Income_2016, queen = TRUE)
+listw_income_2016 <- nb2listw(nb_income_2016, style = "W")
+
+global_moran_income_2016 <- moran.test(Census_Joined_Income_2016$median_house_income, listw = listw_income_2016)
+
+print(global_moran_income_2016)
+
+x_std_2016_income <- as.vector(scale(Census_Joined_Income_2016$median_house_income))
+y_lag_2016_income <- lag.listw(listw_income_2016, x_std_2016_income)
+
+
+
+
+# rent(2016)
+
+
+Census_Joined_Rent_2016 <- Census_Joined_2016 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2016 <- poly2nb(Census_Joined_Rent_2016, queen = TRUE)
+listw_rent_2016 <- nb2listw(nb_rent_2016, style = "W")
+
+global_moran_rent_2016 <- moran.test(Census_Joined_Rent_2016$median_gross_rent, listw = listw_rent_2016)
+print(global_moran_rent_2016)
+
+x_std_2016_rent <- as.vector(scale(Census_Joined_Rent_2016$median_gross_rent))
+y_lag_2016_rent <- lag.listw(listw_rent_2016, x_std_2016_rent)
+
+
+
+
+# 2015
+# income(2015)
+
+
+Census_Joined_Income_2015 <- Census_Joined_2015 %>%
+  drop_na(median_house_income)
+
+nb_income_2015 <- poly2nb(Census_Joined_Income_2015, queen = TRUE)
+listw_income_2015 <- nb2listw(nb_income_2015, style = "W")
+
+global_moran_income_2015 <- moran.test(Census_Joined_Income_2015$median_house_income, listw = listw_income_2015)
+
+print(global_moran_income_2015)
+
+x_std_2015_income <- as.vector(scale(Census_Joined_Income_2015$median_house_income))
+y_lag_2015_income <- lag.listw(listw_income_2015, x_std_2015_income)
+
+
+
+
+# rent(2015)
+
+Census_Joined_Rent_2015 <- Census_Joined_2015 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2015 <- poly2nb(Census_Joined_Rent_2015, queen = TRUE)
+listw_rent_2015 <- nb2listw(nb_rent_2015, style = "W")
+
+global_moran_rent_2015 <- moran.test(Census_Joined_Rent_2015$median_gross_rent, listw = listw_rent_2015)
+print(global_moran_rent_2015)
+
+x_std_2015_rent <- as.vector(scale(Census_Joined_Rent_2015$median_gross_rent))
+y_lag_2015_rent <- lag.listw(listw_rent_2015, x_std_2015_rent)
+
+
+
+
+# 2014
+# income(2014)
+
+
+Census_Joined_Income_2014 <- Census_Joined_2014 %>%
+  drop_na(median_house_income)
+
+nb_income_2014 <- poly2nb(Census_Joined_Income_2014, queen = TRUE)
+listw_income_2014 <- nb2listw(nb_income_2014, style = "W")
+
+global_moran_income_2014 <- moran.test(Census_Joined_Income_2014$median_house_income, listw = listw_income_2014)
+
+print(global_moran_income_2014)
+
+x_std_2014_income <- as.vector(scale(Census_Joined_Income_2014$median_house_income))
+y_lag_2014_income <- lag.listw(listw_income_2014, x_std_2014_income)
+
+
+
+
+# rent(2014)
+
+
+Census_Joined_Rent_2014 <- Census_Joined_2014 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2014 <- poly2nb(Census_Joined_Rent_2014, queen = TRUE)
+listw_rent_2014 <- nb2listw(nb_rent_2014, style = "W")
+
+global_moran_rent_2014 <- moran.test(Census_Joined_Rent_2014$median_gross_rent, listw = listw_rent_2014)
+print(global_moran_rent_2014)
+
+x_std_2014_rent <- as.vector(scale(Census_Joined_Rent_2014$median_gross_rent))
+y_lag_2014_rent <- lag.listw(listw_rent_2014, x_std_2014_rent)
+
+
+
+
+# 2013
+# income(2013) -> spatial unit
+
+
+Census_Joined_Income_2013 <- Census_Joined_2013 %>%
+  drop_na(median_house_income)
+
+nb_income_2013 <- poly2nb(Census_Joined_Income_2013, queen = TRUE)
+listw_income_2013 <- nb2listw(nb_income_2013, style = "W", zero.policy = TRUE) # spatial unit same as 2017
+
+global_moran_income_2013 <- moran.test(Census_Joined_Income_2013$median_house_income, listw = listw_income_2013)
+
+print(global_moran_income_2013)
+
+x_std_2013_income <- as.vector(scale(Census_Joined_Income_2013$median_house_income))
+y_lag_2013_income <- lag.listw(listw_income_2013, x_std_2013_income)
+
+
+
+
+# rent(2013)
+
+
+Census_Joined_Rent_2013 <- Census_Joined_2013 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2013 <- poly2nb(Census_Joined_Rent_2013, queen = TRUE)
+listw_rent_2013 <- nb2listw(nb_rent_2013, style = "W")
+
+global_moran_rent_2013 <- moran.test(Census_Joined_Rent_2013$median_gross_rent, listw = listw_rent_2013)
+print(global_moran_rent_2013)
+
+x_std_2013_rent <- as.vector(scale(Census_Joined_Rent_2013$median_gross_rent))
+y_lag_2013_rent <- lag.listw(listw_rent_2013, x_std_2013_rent)
+
+
+
+
+# 2012
+# income(2012)
+
+
+Census_Joined_Income_2012 <- Census_Joined_2012 %>%
+  drop_na(median_house_income)
+
+nb_income_2012 <- poly2nb(Census_Joined_Income_2012, queen = TRUE)
+listw_income_2012 <- nb2listw(nb_income_2012, style = "W")
+
+global_moran_income_2012 <- moran.test(Census_Joined_Income_2012$median_house_income, listw = listw_income_2012)
+
+print(global_moran_income_2012)
+
+x_std_2012_income <- as.vector(scale(Census_Joined_Income_2012$median_house_income))
+y_lag_2012_income <- lag.listw(listw_income_2012, x_std_2012_income)
+
+
+
+
+# rent(2012) -> spatial unit
+
+
+Census_Joined_Rent_2012 <- Census_Joined_2012 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2012 <- poly2nb(Census_Joined_Rent_2012, queen = TRUE)
+listw_rent_2012 <- nb2listw(nb_rent_2012, style = "W", zero.policy = TRUE) #spatial unit
+
+global_moran_rent_2012 <- moran.test(Census_Joined_Rent_2012$median_gross_rent, listw = listw_rent_2012)
+print(global_moran_rent_2012)
+
+x_std_2012_rent <- as.vector(scale(Census_Joined_Rent_2012$median_gross_rent))
+y_lag_2012_rent <- lag.listw(listw_rent_2012, x_std_2012_rent)
+
+
+
+
+# 2011
+# income(2011)
+
+
+Census_Joined_Income_2011 <- Census_Joined_2011 %>%
+  drop_na(median_house_income)
+
+nb_income_2011 <- poly2nb(Census_Joined_Income_2011, queen = TRUE)
+listw_income_2011 <- nb2listw(nb_income_2011, style = "W")
+
+global_moran_income_2011 <- moran.test(Census_Joined_Income_2011$median_house_income, listw = listw_income_2011)
+
+print(global_moran_income_2011)
+
+x_std_2011_income <- as.vector(scale(Census_Joined_Income_2011$median_house_income))
+y_lag_2011_income <- lag.listw(listw_income_2011, x_std_2011_income)
+
+
+
+
+# rent(2011)
+
+
+Census_Joined_Rent_2011 <- Census_Joined_2011 %>%
+  drop_na(median_gross_rent)
+
+nb_rent_2011 <- poly2nb(Census_Joined_Rent_2011, queen = TRUE)
+listw_rent_2011 <- nb2listw(nb_rent_2011, style = "W")
+
+global_moran_rent_2011 <- moran.test(Census_Joined_Rent_2011$median_gross_rent, listw = listw_rent_2011)
+print(global_moran_rent_2011)
+
+x_std_2011_rent <- as.vector(scale(Census_Joined_Rent_2011$median_gross_rent))
+y_lag_2011_rent <- lag.listw(listw_rent_2011, x_std_2011_rent)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Even more libraries
+
+library(spdep)
+library(tmap)
+library(tidyverse)
+library(rgeoda)
+```
+
+
+# Income
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Plotting Global Morans I Values for INCOME
+
+# isolating Moran's I
+i_I_11 <- global_moran_income_2011$estimate[["Moran I statistic"]]
+i_I_12 <- global_moran_income_2012$estimate[["Moran I statistic"]]
+i_I_13 <- global_moran_income_2013$estimate[["Moran I statistic"]]
+i_I_14 <- global_moran_income_2014$estimate[["Moran I statistic"]]
+i_I_15 <- global_moran_income_2015$estimate[["Moran I statistic"]]
+i_I_16 <- global_moran_income_2016$estimate[["Moran I statistic"]]
+i_I_17 <- global_moran_income_2017$estimate[["Moran I statistic"]]
+i_I_18 <- global_moran_income_2018$estimate[["Moran I statistic"]]
+i_I_19 <- global_moran_income_2019$estimate[["Moran I statistic"]]
+i_I_20 <- global_moran_income_2020$estimate[["Moran I statistic"]]
+i_I_21 <- global_moran_income_2021$estimate[["Moran I statistic"]]
+
+i_I <- data.frame(
+  year = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021),
+  morans_I = c(i_I_11, i_I_12, i_I_13, i_I_14, i_I_15, i_I_16, i_I_17,
+               i_I_18, i_I_19, i_I_20, i_I_21)
+)
+
+ggplot(i_I, aes(x = year, y = morans_I)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Income Global Moran's I from 2011 to 2021",
+       x = "Year",
+       y = "Moran's I") +
+  ylim(0, max(i_I$morans_I) * 1.05) +
+  theme_bw()
+```
+
+Moran's I for income has been steady at just over 0.7 for this 11 year period. 0.7 indicates high spatial autocorrelation.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# INCOME MORANS I MAPS
+
+# Income Clusters for 2021
+
+# The local Moran I map for Income.
+
+# We do end up needing to get rid of NA values.
+
+Census_Joined_Income <- Census_Joined_2021%>%
+  drop_na(median_house_income)
+
+# I drop values for income and rent seperately, since some observations have
+# one but not the other.
+
+# First we create the weights for each census tract.
+
+nb_i <- poly2nb(Census_Joined_Income, queen = TRUE) # queen shares point or border
+nbw_i <- nb2listw(nb_i, style = "W")
+
+# Defining the map by z-scores
+
+lmoran_income <- localmoran(Census_Joined_Income$median_house_income,
+                               nbw_i, alternative = "greater")
+
+Census_Joined_Income$lmZ_i <- lmoran_income[, "Z.Ii"]
+
+# Dang I was pretty spot on.
+
+# This next line of code will show low and high income levels. We define the
+# the levels and correlations first then plot.
+
+# This is done now by p-values (at .05)
+# Need to make p-value column first.
+
+Census_Joined_Income$lmp <- lmoran_income[, 5]
+
+lag_income <- lag.listw(nbw_i, scale(Census_Joined_Income$median_house_income))
+mp_i <- data.frame(
+  x = as.vector(scale(Census_Joined_Income$median_house_income)),
+  wx = lag_income
+)
+
+Census_Joined_Income$quadrant <- NA
+
+
+# high-high
+
+Census_Joined_Income[(mp_i$x >= 0 & mp_i$wx >= 0) & (Census_Joined_Income$lmp <= 0.05), "quadrant"]<- 1
+
+
+# low-low
+
+Census_Joined_Income[(mp_i$x <= 0 & mp_i$wx <= 0) & (Census_Joined_Income$lmp <= 0.05), "quadrant"]<- 2
+
+
+# high-low
+
+Census_Joined_Income[(mp_i$x >= 0 & mp_i$wx <= 0) & (Census_Joined_Income$lmp <= 0.05), "quadrant"]<- 3
+
+
+# low-high
+
+Census_Joined_Income[(mp_i$x <= 0 & mp_i$wx >= 0) & (Census_Joined_Income$lmp <= 0.05), "quadrant"]<- 4
+
+
+# non-significant
+
+Census_Joined_Income[(Census_Joined_Income$lmp > 0.05), "quadrant"] <- 5
+
+Census_Joined_Income$popup <- paste0(
+  "<b>GEOID: </b>", Census_Joined_Income$GEOID, "<br>",
+  "<b>Income: </b>$", round(Census_Joined_Income$median_house_income), "<br>",
+  "<b>Cluster: </b>", Census_Joined_Income$quadrant
+)
+
+
+# to make map interactive, change plot to view in tmap_mode()
+# we had problems with the title
+```
+
+### Univariate Local Moran's I: Income - 2021
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+p_i_21 <- tm_shape(Census_Joined_Income) +
+  tmap_mode("plot")+
+  tm_fill(col = "quadrant", title = "", breaks = c(1, 2, 3, 4, 5, 6),
+          palette =  c("red", "blue", "lightpink", "skyblue2", "white"),
+          labels = c("High-High", "Low-Low", "High-Low",
+                     "Low-High", "Non-significant")) +
+  tm_legend(text.size = 1)  +
+  tm_borders(alpha = 0.05, lwd = .1) +
+  tm_layout(frame = FALSE,  title = "")  +
+  tm_layout(legend.outside = TRUE)
+
+p_i_21
+
+# Blue shows areas of low income neighborhoods next to low income neighborhoods.
+
+# Red shows areas of high neighborhoods next to high income neighborhoods
+
+# Income Clusters for 2016
+Census_Joined_Income_16 <- Census_Joined_2016 %>%
+  drop_na(median_house_income)
+
+nb_i_16 <- poly2nb(Census_Joined_Income_16, queen = TRUE)
+nbw_i_16 <- nb2listw(nb_i_16, style = "W")
+
+lmoran_income_16 <- localmoran(Census_Joined_Income_16$median_house_income,
+                               nbw_i_16, alternative = "greater")
+
+Census_Joined_Income_16$lmZ_i <- lmoran_income_16[, "Z.Ii"]
+Census_Joined_Income_16$lmp <- lmoran_income_16[, 5]
+
+lag_income_16 <- lag.listw(nbw_i_16, scale(Census_Joined_Income_16$median_house_income))
+mp_i_16 <- data.frame(
+  x = as.vector(scale(Census_Joined_Income_16$median_house_income)),
+  wx = lag_income_16
+)
+
+Census_Joined_Income_16$quadrant <- NA
+Census_Joined_Income_16[(mp_i_16$x >= 0 & mp_i_16$wx >= 0) & (Census_Joined_Income_16$lmp <= 0.05), "quadrant"] <- 1
+Census_Joined_Income_16[(mp_i_16$x <= 0 & mp_i_16$wx <= 0) & (Census_Joined_Income_16$lmp <= 0.05), "quadrant"] <- 2
+Census_Joined_Income_16[(mp_i_16$x >= 0 & mp_i_16$wx <= 0) & (Census_Joined_Income_16$lmp <= 0.05), "quadrant"] <- 3
+Census_Joined_Income_16[(mp_i_16$x <= 0 & mp_i_16$wx >= 0) & (Census_Joined_Income_16$lmp <= 0.05), "quadrant"] <- 4
+Census_Joined_Income_16[(Census_Joined_Income_16$lmp > 0.05), "quadrant"] <- 5
+```
+
+### Univariate Local Moran's I: Income - 2016
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+p_i_16 <- tm_shape(Census_Joined_Income_16) +
+  tmap_mode("plot") +
+  tm_fill(col = "quadrant", title = "", breaks = c(1, 2, 3, 4, 5, 6),
+          palette = c("red", "blue", "lightpink", "skyblue2", "white"),
+          labels = c("High-High", "Low-Low", "High-Low", "Low-High", "Non-significant")) +
+  tm_legend(text.size = 1) +
+  tm_borders(alpha = 0.05, lwd = 0.1) +
+  tm_layout(frame = FALSE, title = "") +
+  tm_layout(legend.outside = TRUE)
+
+p_i_16
+
+# Income Clusters for 2011
+Census_Joined_Income_11 <- Census_Joined_2011 %>%
+  drop_na(median_house_income)
+
+nb_i_11 <- poly2nb(Census_Joined_Income_11, queen = TRUE)
+nbw_i_11 <- nb2listw(nb_i_11, style = "W")
+
+lmoran_income_11 <- localmoran(Census_Joined_Income_11$median_house_income,
+                               nbw_i_11, alternative = "greater")
+
+Census_Joined_Income_11$lmZ_i <- lmoran_income_11[, "Z.Ii"]
+Census_Joined_Income_11$lmp <- lmoran_income_11[, 5]
+
+lag_income_11 <- lag.listw(nbw_i_11, scale(Census_Joined_Income_11$median_house_income))
+mp_i_11 <- data.frame(
+  x = as.vector(scale(Census_Joined_Income_11$median_house_income)),
+  wx = lag_income_11
+)
+
+Census_Joined_Income_11$quadrant <- NA
+Census_Joined_Income_11[(mp_i_11$x >= 0 & mp_i_11$wx >= 0) & (Census_Joined_Income_11$lmp <= 0.05), "quadrant"] <- 1
+Census_Joined_Income_11[(mp_i_11$x <= 0 & mp_i_11$wx <= 0) & (Census_Joined_Income_11$lmp <= 0.05), "quadrant"] <- 2
+Census_Joined_Income_11[(mp_i_11$x >= 0 & mp_i_11$wx <= 0) & (Census_Joined_Income_11$lmp <= 0.05), "quadrant"] <- 3
+Census_Joined_Income_11[(mp_i_11$x <= 0 & mp_i_11$wx >= 0) & (Census_Joined_Income_11$lmp <= 0.05), "quadrant"] <- 4
+Census_Joined_Income_11[(Census_Joined_Income_11$lmp > 0.05), "quadrant"] <- 5
+```
+
+### Univariate Local Moran's I: Income - 2011
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+p_i_11 <- tm_shape(Census_Joined_Income_11) +
+  tmap_mode("plot") +
+  tm_fill(col = "quadrant", title = "", breaks = c(1, 2, 3, 4, 5, 6),
+          palette = c("red", "blue", "lightpink", "skyblue2", "white"),
+          labels = c("High-High", "Low-Low", "High-Low", "Low-High", "Non-significant")) +
+  tm_legend(text.size = 1) +
+  tm_borders(alpha = 0.05, lwd = 0.1) +
+  tm_layout(frame = FALSE, title = "") +
+  tm_layout(legend.outside = TRUE)
+
+p_i_11
+
+```
+
+Cluster's are colored at the 0.05 significance level. Data for the years 2011 and 2013 are not as rich in data as 2021, giving some error. These three plots and the Global Moran's I values indicate that Virginia's demographics hasn't changed much in the past 11 years. Red can be found in suburban regions (especially North), while the blue exists more in the Southwest region. For the most part, high income census tracts are attracted to/attract other high income census tracts, while low income census tracts are attracted to/attract other low income census tracts.
+
+
+# Rent
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Plotting Global Morans I Values for RENT
+
+# isolating Moran's I
+r_I_11 <- global_moran_rent_2011$estimate[["Moran I statistic"]]
+r_I_12 <- global_moran_rent_2012$estimate[["Moran I statistic"]]
+r_I_13 <- global_moran_rent_2013$estimate[["Moran I statistic"]]
+r_I_14 <- global_moran_rent_2014$estimate[["Moran I statistic"]]
+r_I_15 <- global_moran_rent_2015$estimate[["Moran I statistic"]]
+r_I_16 <- global_moran_rent_2016$estimate[["Moran I statistic"]]
+r_I_17 <- global_moran_rent_2017$estimate[["Moran I statistic"]]
+r_I_18 <- global_moran_rent_2018$estimate[["Moran I statistic"]]
+r_I_19 <- global_moran_rent_2019$estimate[["Moran I statistic"]]
+r_I_20 <- global_moran_rent_2020$estimate[["Moran I statistic"]]
+r_I_21 <- global_moran_rent_2021$estimate[["Moran I statistic"]]
+
+r_I <- data.frame(
+  year = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021),
+  morans_I = c(r_I_11, r_I_12, r_I_13, r_I_14, r_I_15, r_I_16, r_I_17,
+               r_I_18, r_I_19, r_I_20, r_I_21)
+)
+
+ggplot(r_I, aes(x = year, y = morans_I)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Rent Global Moran's I from 2011 to 2021",
+       x = "Year",
+       y = "Moran's I") +
+  ylim(0, max(r_I$morans_I) * 1.05) +
+  theme_bw()
+```
+
+The Global Moran's I for rent is very similar to income. The beginning values might be high due to some error.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# RENT MORANS I MAPS
+
+# Rent Clusters for 2021
+
+Census_Joined_Rent <- Census_Joined_2021%>%
+  drop_na(median_gross_rent)
+# I drop values for income and rent seperately, since some observations have
+# one but not the other.
+
+# First we create the weights for each census tract.
+nb_r <- poly2nb(Census_Joined_Rent, queen = TRUE) # queen shares point or border
+nbw_r <- nb2listw(nb_r, style = "W")
+
+# Next create the local moran variables for median_gross_rent.
+lmoran_rent <- localmoran(Census_Joined_Rent$median_gross_rent,
+                          nbw_r, alternative = "greater")
+
+# Defining the map by z-scores
+Census_Joined_Rent$lmZ_r <- lmoran_rent[, "Z.Ii"]
+
+Census_Joined_Rent$lmp <- lmoran_rent[, 5]
+
+lag_rent <- lag.listw(nbw_r, scale(Census_Joined_Rent$median_gross_rent))
+mp_r <- data.frame(
+  x = as.vector(scale(Census_Joined_Rent$median_gross_rent)),
+  wx = lag_rent
+)
+
+Census_Joined_Rent$quadrant <- NA
+# high-high
+Census_Joined_Rent[(mp_r$x >= 0 & mp_r$wx >= 0) & (Census_Joined_Rent$lmp <= 0.05), "quadrant"]<- 1
+# low-low
+Census_Joined_Rent[(mp_r$x <= 0 & mp_r$wx <= 0) & (Census_Joined_Rent$lmp <= 0.05), "quadrant"]<- 2
+# high-low
+Census_Joined_Rent[(mp_r$x >= 0 & mp_r$wx <= 0) & (Census_Joined_Rent$lmp <= 0.05), "quadrant"]<- 3
+# low-high
+Census_Joined_Rent[(mp_r$x <= 0 & mp_r$wx >= 0) & (Census_Joined_Rent$lmp <= 0.05), "quadrant"]<- 4
+# non-significant
+Census_Joined_Rent[(Census_Joined_Rent$lmp > 0.05), "quadrant"] <- 5
+```
+
+### Univariate Local Moran's I: Rent - 2021
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+p_r_21 <- tm_shape(Census_Joined_Rent) + 
+  tmap_mode("plot")+
+  tm_fill(col = "quadrant", title = "",
+                                              breaks = c(1, 2, 3, 4, 5, 6),
+                                              palette =  c("red", "blue", "lightpink", "skyblue", "white"),
+                                              labels = c("High-High", "Low-Low", "High-Low",
+                                                         "Low-High", "Non-significant")) +
+  tm_legend(text.size = 1)  +
+  #tm_borders(alpha = 0, lwd = 0) +
+  tm_borders(ltw = .1, alpha = .1, col = "black")+
+  tm_layout(frame = FALSE,  title = "")  +
+  tm_layout(legend.outside = TRUE)
+p_r_21
+
+
+# Rent Clusters for 2016
+
+Census_Joined_Rent_16 <- Census_Joined_2016 %>%
+  drop_na(median_gross_rent)
+
+nb_r_16 <- poly2nb(Census_Joined_Rent_16, queen = TRUE)
+nbw_r_16 <- nb2listw(nb_r_16, style = "W")
+
+lmoran_rent_16 <- localmoran(Census_Joined_Rent_16$median_gross_rent,
+                             nbw_r_16, alternative = "greater")
+
+Census_Joined_Rent_16$lmZ_r <- lmoran_rent_16[, "Z.Ii"]
+Census_Joined_Rent_16$lmp <- lmoran_rent_16[, 5]
+
+lag_rent_16 <- lag.listw(nbw_r_16, scale(Census_Joined_Rent_16$median_gross_rent))
+mp_r_16 <- data.frame(
+  x = as.vector(scale(Census_Joined_Rent_16$median_gross_rent)),
+  wx = lag_rent_16
+)
+
+Census_Joined_Rent_16$quadrant <- NA
+Census_Joined_Rent_16[(mp_r_16$x >= 0 & mp_r_16$wx >= 0) & (Census_Joined_Rent_16$lmp <= 0.05), "quadrant"] <- 1
+Census_Joined_Rent_16[(mp_r_16$x <= 0 & mp_r_16$wx <= 0) & (Census_Joined_Rent_16$lmp <= 0.05), "quadrant"] <- 2
+Census_Joined_Rent_16[(mp_r_16$x >= 0 & mp_r_16$wx <= 0) & (Census_Joined_Rent_16$lmp <= 0.05), "quadrant"] <- 3
+Census_Joined_Rent_16[(mp_r_16$x <= 0 & mp_r_16$wx >= 0) & (Census_Joined_Rent_16$lmp <= 0.05), "quadrant"] <- 4
+Census_Joined_Rent_16[(Census_Joined_Rent_16$lmp > 0.05), "quadrant"] <- 5
+```
+
+### Univariate Local Moran's I: Rent - 2016
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+p_r_16 <- tm_shape(Census_Joined_Rent_16) + 
+  tmap_mode("plot") +
+  tm_fill(col = "quadrant", title = "",
+          breaks = c(1, 2, 3, 4, 5, 6),
+          palette = c("red", "blue", "lightpink", "skyblue", "white"),
+          labels = c("High-High", "Low-Low", "High-Low", "Low-High", "Non-significant")) +
+  tm_legend(text.size = 1) +
+  tm_borders(lwd = 0.1, alpha = 0.1, col = "black") +
+  tm_layout(frame = FALSE, title = "") +
+  tm_layout(legend.outside = TRUE)
+
+p_r_16
+
+
+# Rent Clusters for 2011
+Census_Joined_Rent_11 <- Census_Joined_2011 %>%
+  drop_na(median_gross_rent)
+
+nb_r_11 <- poly2nb(Census_Joined_Rent_11, queen = TRUE)
+nbw_r_11 <- nb2listw(nb_r_11, style = "W")
+
+lmoran_rent_11 <- localmoran(Census_Joined_Rent_11$median_gross_rent,
+                             nbw_r_11, alternative = "greater")
+
+Census_Joined_Rent_11$lmZ_r <- lmoran_rent_11[, "Z.Ii"]
+Census_Joined_Rent_11$lmp <- lmoran_rent_11[, 5]
+
+lag_rent_11 <- lag.listw(nbw_r_11, scale(Census_Joined_Rent_11$median_gross_rent))
+mp_r_11 <- data.frame(
+  x = as.vector(scale(Census_Joined_Rent_11$median_gross_rent)),
+  wx = lag_rent_11
+)
+
+Census_Joined_Rent_11$quadrant <- NA
+Census_Joined_Rent_11[(mp_r_11$x >= 0 & mp_r_11$wx >= 0) & (Census_Joined_Rent_11$lmp <= 0.05), "quadrant"] <- 1
+Census_Joined_Rent_11[(mp_r_11$x <= 0 & mp_r_11$wx <= 0) & (Census_Joined_Rent_11$lmp <= 0.05), "quadrant"] <- 2
+Census_Joined_Rent_11[(mp_r_11$x >= 0 & mp_r_11$wx <= 0) & (Census_Joined_Rent_11$lmp <= 0.05), "quadrant"] <- 3
+Census_Joined_Rent_11[(mp_r_11$x <= 0 & mp_r_11$wx >= 0) & (Census_Joined_Rent_11$lmp <= 0.05), "quadrant"] <- 4
+Census_Joined_Rent_11[(Census_Joined_Rent_11$lmp > 0.05), "quadrant"] <- 5
+```
+
+### Univariate Local Moran's I: Rent - 2011
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+p_r_11 <- tm_shape(Census_Joined_Rent_11) + 
+  tmap_mode("plot") +
+  tm_fill(col = "quadrant", title = "",
+          breaks = c(1, 2, 3, 4, 5, 6),
+          palette = c("red", "blue", "lightpink", "skyblue", "white"),
+          labels = c("High-High", "Low-Low", "High-Low", "Low-High", "Non-significant")) +
+  tm_legend(text.size = 1) +
+  tm_borders(lwd = 0.1, alpha = 0.1, col = "black") +
+  tm_layout(frame = FALSE, title = "") +
+  tm_layout(legend.outside = TRUE)
+
+p_r_11
+```
+
+Results may vary because of NA values. Trends here are once again similar to those for income. Low to low rent clusters to extend more outwards, however, while high to high slightly more inwards.
+
+
+# Bivariate Moran's I for Income and Rent
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Global Bivariate Moran's I for Years 2011 until 2021 ------------------
+
+# To calculate bivariate Moran's I, I took from here:
+# https://r-spatial.github.io/spdep/reference/moran_bv.html
+
+# BE CAREFUL RUNNING THIS CODE. THE I VALUES HAVE TO SIMULATE FOR EACH PART, SO 
+# YOU HAVE TO WAIT A SECOND BEFORE YOU CAN MOVE TO THE NEXT YEAR
+
+# 2021
+
+
+Census_Joined_2021 <- Census_Joined_2021[!is.na(Census_Joined_2021$median_house_income) &
+                                           !is.na(Census_Joined_2021$median_gross_rent), ]
+
+x <- Census_Joined_2021$median_house_income
+y <- Census_Joined_2021$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2021, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_21 <- res_xy$t0
+
+
+# 2020
+
+Census_Joined_2020 <- Census_Joined_2020[!is.na(Census_Joined_2020$median_house_income) &
+                                           !is.na(Census_Joined_2020$median_gross_rent), ]
+
+x <- Census_Joined_2020$median_house_income
+y <- Census_Joined_2020$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2020, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_20 <- res_xy$t0
+
+
+# 2019
+
+Census_Joined_2019 <- Census_Joined_2019[!is.na(Census_Joined_2019$median_house_income) &
+                                           !is.na(Census_Joined_2019$median_gross_rent), ]
+
+x <- Census_Joined_2019$median_house_income
+y <- Census_Joined_2019$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2019, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_19 <- res_xy$t0
+
+# 2018
+
+Census_Joined_2018 <- Census_Joined_2018[!is.na(Census_Joined_2018$median_house_income) &
+                                           !is.na(Census_Joined_2018$median_gross_rent), ]
+
+x <- Census_Joined_2018$median_house_income
+y <- Census_Joined_2018$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2018, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_18 <- res_xy$t0
+
+
+# 2017
+
+Census_Joined_2017 <- Census_Joined_2017[!is.na(Census_Joined_2017$median_house_income) &
+                                           !is.na(Census_Joined_2017$median_gross_rent), ]
+x <- Census_Joined_2017$median_house_income
+y <- Census_Joined_2017$median_gross_rent
+neighbors <- poly2nb(Census_Joined_2017, queen = TRUE)
+#listw <- nb2listw(neighbors)
+#res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_17 <- res_xy$t0
+
+
+# 2016
+Census_Joined_2016 <- Census_Joined_2016[!is.na(Census_Joined_2016$median_house_income) &
+                                           !is.na(Census_Joined_2016$median_gross_rent), ]
+
+x <- Census_Joined_2016$median_house_income
+y <- Census_Joined_2016$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2016, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_16 <- res_xy$t0
+
+
+# 2015
+
+Census_Joined_2015 <- Census_Joined_2015[!is.na(Census_Joined_2015$median_house_income) &
+                                           !is.na(Census_Joined_2015$median_gross_rent), ]
+
+x <- Census_Joined_2015$median_house_income
+y <- Census_Joined_2015$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2015, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_15 <- res_xy$t0
+
+
+# 2014
+
+Census_Joined_2014 <- Census_Joined_2014[!is.na(Census_Joined_2014$median_house_income) &
+                                           !is.na(Census_Joined_2014$median_gross_rent), ]
+
+x <- Census_Joined_2014$median_house_income
+y <- Census_Joined_2014$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2014, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_14 <- res_xy$t0
+
+
+# 2013
+
+Census_Joined_2013 <- Census_Joined_2013[!is.na(Census_Joined_2013$median_house_income) &
+                                           !is.na(Census_Joined_2013$median_gross_rent), ]
+
+x <- Census_Joined_2013$median_house_income
+y <- Census_Joined_2013$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2013, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_13 <- res_xy$t0
+
+
+# 2012
+
+Census_Joined_2012 <- Census_Joined_2012[!is.na(Census_Joined_2012$median_house_income) &
+                                           !is.na(Census_Joined_2012$median_gross_rent), ]
+
+x <- Census_Joined_2012$median_house_income
+y <- Census_Joined_2012$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2012, queen = TRUE)
+#listw <- nb2listw(neighbors)
+
+#res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_12 <- res_xy$t0
+
+
+# 2011
+
+Census_Joined_2011 <- Census_Joined_2011[!is.na(Census_Joined_2011$median_house_income) &
+                                           !is.na(Census_Joined_2011$median_gross_rent), ]
+
+x <- Census_Joined_2011$median_house_income
+y <- Census_Joined_2011$median_gross_rent
+
+neighbors <- poly2nb(Census_Joined_2011, queen = TRUE)
+listw <- nb2listw(neighbors)
+
+res_xy <- moran_bv(x, y, listw, nsim=499)
+bv_I_11 <- res_xy$t0
+
+
+# Making a df of all the values:
+
+bv_I <- data.frame(
+  year = c(2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021),
+  morans_I = c(bv_I_11, bv_I_12, bv_I_13, bv_I_14, bv_I_15, bv_I_16, bv_I_17,
+               bv_I_18, bv_I_19, bv_I_20, bv_I_21)
+)
+
+# plot
+
+ggplot(bv_I, aes(x = year, y = morans_I)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Bivariate Global Moran's I from 2011 to 2021",
+       x = "Year",
+       y = "Moran's I") +
+  ylim(0, max(bv_I$morans_I) * 1.05) +
+  theme_bw()
+
+# Steady change - nothing very surprising there.
+```
+
+This bivariate Moran's I shows a cross analysis for rent and income clusters. This value has stayed just below 0.7 for the past 11 years, showing a not so different trend from just income and rent. 
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Local Cluster Plots for LISA (2011, 2016, 2021) -------------------------
+
+# These results try to mimic rgeoda. Code was found here (we use queen weights)
+# https://geodacenter.github.io/rgeoda/articles/rgeoda_tutorial.html
+
+# 2021
+
+queen_w_21 <- queen_weights(Census_Joined_2021)
+
+# Bivariate local Moran's I
+qsa_21 <- local_bimoran(queen_w_21, Census_Joined_2021[c('median_house_income','median_gross_rent')])
+
+# something to take in with our results.
+# "it ignores in-situ correlation between the two variables. The most meaningful
+#application of the bivariate Local Moran statistic is comparing the same 
+# variable at two time periods." - from the link
+
+lisa_colors_21 <- lisa_colors(qsa_21)
+lisa_labels_21 <- lisa_labels(qsa_21)
+lisa_clusters_21 <- lisa_clusters(qsa_21)
+
+plot(st_geometry(Census_Joined_2021), 
+     col = sapply(lisa_clusters_21, function(x){return(lisa_colors_21[[x+1]])}), 
+     border = "#333333", lwd = 0.2)
+  title(main = "Bivariate Local Moran's I: Income vs. Rent - 2021")
+legend("topleft", 
+       legend = c("Not significant", "High-High", "Low-Low", "High-Low", "Low-High"), 
+       fill = unlist(lisa_colors_21), 
+       border = "black", 
+       cex = 0.7, 
+       bty = "n")
+  
+# 2016
+
+queen_w_16 <- queen_weights(Census_Joined_2016)
+
+qsa_16 <- local_bimoran(queen_w_16, Census_Joined_2016[c('median_house_income','median_gross_rent')])
+
+lisa_colors_16 <- lisa_colors(qsa_16)
+lisa_labels_16 <- lisa_labels(qsa_16)
+lisa_clusters_16 <- lisa_clusters(qsa_16)
+
+plot(st_geometry(Census_Joined_2016), 
+     col = sapply(lisa_clusters_16, function(x){ lisa_colors_16[[x+1]] }), 
+     border = "#333333", lwd = 0.2)
+title(main = "Bivariate Local Moran's I: Income vs. Rent - 2016")
+legend("topleft", 
+       legend = c("Not significant", "High-High", "Low-Low", "High-Low", "Low-High"), 
+       fill = unlist(lisa_colors_16), 
+       border = "black", 
+       cex = 0.7, 
+       bty = "n")
+
+# whole lot of missing data
+
+# 2011
+
+queen_w_11 <- queen_weights(Census_Joined_2011)
+
+# bivariate Local Moran's I
+qsa_11 <- local_bimoran(queen_w_11, Census_Joined_2011[c('median_house_income','median_gross_rent')])
+
+lisa_colors_11 <- lisa_colors(qsa_11)
+lisa_labels_11 <- lisa_labels(qsa_11)
+lisa_clusters_11 <- lisa_clusters(qsa_11)
+
+plot(st_geometry(Census_Joined_2011), 
+     col = sapply(lisa_clusters_11, function(x){ lisa_colors_11[[x+1]] }), 
+     border = "#333333", lwd = 0.2)
+title(main = "Bivariate Local Moran's I: Income vs. Rent - 2011")
+legend("topleft", 
+       legend = c("Not significant", "High-High", "Low-Low", "High-Low", "Low-High"), 
+       fill = unlist(lisa_colors_11), 
+       border = "black", 
+       cex = 0.7, 
+       bty = "n")
+# same here
+```
+
+For the most part, this bivariate map shows a similar trend to what has been observed in income and rent spatial clusters. This graph, however, shows more instances of high income census tracts being attracted to lower income census tracts, particularly near smaller cities. Red locations are once again dominated by suburban areas, while the  majority of low market areas/Southwestern Virginia are shaded blue.
+
+The bivariate map should be taken with a grain of salt. Using this map ignores in-situ correlation between the two variables (https://geodacenter.github.io/workbook/6c_local_multi/lab6c.html#bivariate-local-moran).
+
+
+# Takeaways
+
+Virginia is highly autocorrelated in terms of rent and income - almost all Global Moran I values are found near 0.7. In almost every cluster, whether it be income, rent, or both, high valued census tracts were attracted to other high values while low valued census tracts were attracted to other low values. High valued regions were predominantly found in suburban regions, especially Northern Virginia, while low values regions existed across the map, especially in the Southwestern area (and within cites as well). To summarize, wealth and rent affordability vary significantly by location, and regional disparity is very prominent in Virginia.
